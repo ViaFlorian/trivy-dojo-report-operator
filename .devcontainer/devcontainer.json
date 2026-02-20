@@ -96,6 +96,7 @@
     "source=${localWorkspaceFolderBasename}-venv,target=${containerWorkspaceFolder}/.venv,type=volume"
   ],
   "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/postCreateCommand.sh",
+  "postStartCommand": "nohup bash -c 'minikube start &' > minikube.log 2>&1; helm install trivy-operator ${containerWorkspaceFolder}/tests/resources/helm/; kubectl create namespace defectdojo",
   // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
   // "remoteUser": "root"
 }
