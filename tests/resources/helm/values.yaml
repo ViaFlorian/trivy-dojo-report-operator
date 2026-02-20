@@ -1,0 +1,15 @@
+---
+trivy-operator:
+  operator:
+    # -- namespace to install the operator, defaults to the .Release.Namespace
+    namespace: "trivy"
+  excludeNamespaces: "kube-system,kube-public,kube-node-lease"
+  # -- Prometheus ServiceMonitor configuration -- to install the trivy operator with the ServiceMonitor
+  # you must have Prometheus already installed and running. If you do not have Prometheus installed, enabling this will
+  # have no effect.
+  serviceMonitor:
+    # -- enabled determines whether a serviceMonitor should be deployed
+    enabled: false
+  trivy:
+    # original: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+    severity: HIGH,CRITICAL
