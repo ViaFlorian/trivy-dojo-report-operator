@@ -1,0 +1,89 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/debian
+{
+  "name": "Debian",
+  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainers-extra/features/poetry:2": {},
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bierner.markdown-mermaid",
+        "charliermarsh.ruff",
+        "EditorConfig.EditorConfig",
+        "esbenp.prettier-vscode",
+        "ms-python.black-formatter",
+        "ms-python.flake8",
+        "ms-python.isort",
+        "ms-python.mypy-type-checker",
+        "ms-python.python",
+        "SonarSource.sonarlint-vscode",
+        "streetsidesoftware.code-spell-checker-german",
+        "streetsidesoftware.code-spell-checker",
+      ],
+      "git.branchProtection": [
+        "main",
+        "master"
+      ],
+      "settings": {
+        "files.insertFinalNewline": true,
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true,
+        "python.defaultInterpreterPath": "./.venv/bin/python",
+        "python.formatting.provider": "black",
+        "python.formatting.blackArgs": [
+          "--no-color"
+        ],
+        "python.linting.mypyEnabled": true,
+        "python.linting.mypyPath": "./.venv/bin/dmypy",
+        "python.linting.mypyArgs": [
+          "run",
+          "--",
+          "--ignore-missing-imports",
+          "--show-column-numbers",
+          "--no-pretty",
+          "--python-executable",
+          "--check-untyped-defs",
+          "--ignore-missing-imports",
+          "./.venv/bin/python"
+        ],
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestEnabled": true,
+        "python.testing.autoTestDiscoverOnSaveEnabled": true,
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.indexing": true,
+        "python.linting.flake8Enabled": false,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "always"
+        },
+        "ruff.path": [
+          "./.venv/bin/ruff"
+        ],
+        "rewrap.wrappingColumn": 88,
+        "isort.args": [
+          "--profile",
+          "black"
+        ],
+      }
+    },
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind",
+    "source=${localEnv:HOME}/.gitconfig,target=/home/vscode/.gitconfig,type=bind",
+    "source=${localWorkspaceFolderBasename}-venv,target=${containerWorkspaceFolder}/.venv,type=volume"
+  ],
+  "postCreateCommand": "bash ${containerWorkspaceFolder}/.devcontainer/postCreateCommand.sh",
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root"
+}
