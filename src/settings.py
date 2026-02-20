@@ -1,7 +1,7 @@
 import logging
 import os
 
-from env_vars import get_required_env_var, get_env_var_bool
+from env_vars import get_env_var_bool, get_required_env_var
 
 logger = logging.getLogger(__name__)
 

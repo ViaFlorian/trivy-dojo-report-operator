@@ -1,11 +1,12 @@
 import json
+from io import BytesIO
+
 import kopf
 import prometheus_client
 import requests
-import settings
-
 from requests.exceptions import HTTPError
-from io import BytesIO
+
+import settings
 
 prometheus_client.start_http_server(9090)
 REQUEST_TIME = prometheus_client.Summary(
@@ -19,6 +20,7 @@ proxies = {
     "http": settings.HTTP_PROXY,
     "https": settings.HTTPS_PROXY,
 } if settings.HTTP_PROXY or settings.HTTPS_PROXY else None
+
 
 def check_allowed_reports(report: str):
     allowed_reports: list[str] = [
