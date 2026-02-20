@@ -2,3 +2,4 @@ __pycache__/
 .cr-release-packages/
 .venv/
 django-DefectDojo/
+.mypy_cache/
