@@ -12,11 +12,20 @@ def test_operator():
     with KopfRunner(['run', '-A', '--verbose', 'src/handlers.py']) as runner:
         # do something while the operator is running.
 
-        subprocess.run("kubectl apply -f tests/resources/trivy_report_manifest.yaml",
+        subprocess.run("kubectl apply -f tests/resources/simple_old_container_deployment.yaml",
                        shell=True, check=True)
-        time.sleep(1)  # give it some time to react and to sleep and to retry
+        
+        # Wait until vulnerability report is created
+        timeout = 30
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            result = subprocess.run("kubectl get vulnerabilityreports --all-namespaces", 
+                                   shell=True, capture_output=True, text=True)
+            if result.stdout and "simple-alpine-deployment" in result.stdout:
+                break
+            time.sleep(1)
 
-        subprocess.run("kubectl delete -f tests/resources/trivy_report_manifest.yaml",
+        subprocess.run("kubectl delete -f tests/resources/simple_old_container_deployment.yaml",
                        shell=True, check=True)
         time.sleep(1)  # give it some time to react
 

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simple-alpine-deployment
+  labels:
+    app: simple-alpine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simple-alpine
+  template:
+    metadata:
+      labels:
+        app: simple-alpine
+    spec:
+      containers:
+        - name: alpine-sleep
+          image: alpine:3.22.2
+          command: ["sleep"]
+          args: ["infinity"]
