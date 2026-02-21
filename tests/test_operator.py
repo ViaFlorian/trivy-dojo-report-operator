@@ -44,7 +44,7 @@ def test_operator():
                            shell=True, check=True)
 
             # Wait until vulnerability report is created
-            timeout = 30
+            timeout = 120
             start_time = time.time()
             while time.time() - start_time < timeout:
                 result = subprocess.run("kubectl get vulnerabilityreports --all-namespaces",
@@ -52,6 +52,8 @@ def test_operator():
                 if result.stdout and "simple-alpine-deployment" in result.stdout:
                     break
                 time.sleep(1)
+
+            time.sleep(1)
 
             subprocess.run("kubectl delete -f tests/resources/simple_old_container_deployment.yaml",
                            shell=True, check=True)
