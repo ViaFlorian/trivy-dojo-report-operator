@@ -67,6 +67,12 @@ def configure(settings: kopf.OperatorSettings, **_):
     )
 
 
+def build_full_object(body):
+    full_object = {}
+    for key in body:
+        full_object[key] = body[key]
+    return full_object
+
 labels: dict = {}
 if settings.LABEL and settings.LABEL_VALUE:
     labels = {settings.LABEL: settings.LABEL_VALUE}
@@ -87,13 +93,7 @@ for report in settings.REPORTS:
 
         logger.info(f"Working on {body['kind']} {meta['name']}")
 
-        # body is the whole kubernetes manifest of a vulnerabilityreport
-        # body is a Python-Object that is not json-serializable,
-        # but body[kind], body[metadata] and so on are
-        # so we create a new json-object here, since kopf does not provide this
-        full_object: dict = {}
-        for i in body:
-            full_object[i] = body[i]
+        full_object = build_full_object(body)
 
         logger.debug(full_object)
 
@@ -196,8 +196,6 @@ for report in settings.REPORTS:
         """
         logger.info(f"Detected deletion of {body['kind']} {meta['name']}")
 
-        full_object: dict = {}
-        for i in body:
-            full_object[i] = body[i]
+        full_object = build_full_object(body)
 
         logger.debug(full_object)
