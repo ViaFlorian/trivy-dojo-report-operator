@@ -67,18 +67,18 @@ def configure(settings: kopf.OperatorSettings, **_):
     )
 
 
-def build_full_object(body):
+def build_full_object(body: dict) -> dict:
     full_object = {}
     for key in body:
         full_object[key] = body[key]
     return full_object
 
 
-def evaluate_if_needed(setting, eval_flag):
+def evaluate_if_needed(setting: str, eval_flag: bool) -> str:
     return eval(setting) if eval_flag else setting
 
 
-def prepare_data(settings):
+def prepare_data(settings) -> dict:
     _DEFECT_DOJO_ENGAGEMENT_NAME = evaluate_if_needed(
         settings.DEFECT_DOJO_ENGAGEMENT_NAME, settings.DEFECT_DOJO_EVAL_ENGAGEMENT_NAME)
     _DEFECT_DOJO_PRODUCT_NAME = evaluate_if_needed(
@@ -113,13 +113,13 @@ def prepare_data(settings):
     return data
 
 
-def create_report_file(full_object):
+def create_report_file(full_object: dict) -> dict:
     json_string = json.dumps(full_object)
     json_file = BytesIO(json_string.encode("utf-8"))
     return {"file": ("report.json", json_file)}
 
 
-def send_to_dojo_request(url, headers, data, files, proxies):
+def send_to_dojo_request(url: str, headers: dict, data: dict, files: dict, proxies: dict) -> requests.Response:
     response = requests.post(
         url, headers=headers, data=data, files=files, verify=True, proxies=proxies)
     return response
