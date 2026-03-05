@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -7,14 +8,22 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from kopf.testing import KopfRunner
 
+# Global list to track reimport-scan requests
+reimport_scan_requests = []
+
 
 class _DefectDojoMockHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/v2/reimport-scan/":
-            # read and discard body (could be multipart/form-data)
+            # read and capture body
             length = int(self.headers.get("Content-Length", 0))
+            body_bytes = b""
             if length:
-                self.rfile.read(length)
+                body_bytes = self.rfile.read(length)
+
+            # Store the request body for verification
+            reimport_scan_requests.append(body_bytes)
+
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -94,6 +103,30 @@ def test_operator():
         assert runner.exit_code == 0
         assert runner.exception is None
 
+        # Verify reimport-scan was called exactly twice
+        assert len(
+            reimport_scan_requests) == 2, f"Expected 2 reimport-scan calls, got {len(reimport_scan_requests)}"
+
+        # Parse the request bodies as JSON
+        bodies = []
+        for req_body in reimport_scan_requests:
+            try:
+                bodies.append(json.loads(req_body.decode('utf-8')))
+            except json.JSONDecodeError:
+                bodies.append(req_body.decode('utf-8'))
+
+        # Extract active values from requests
+        active_values = [body.get("active")
+                         for body in bodies if isinstance(body, dict)]
+
+        # Verify we have one "active = true" and one "active = false"
+        assert len(
+            active_values) == 2, f"Expected 2 requests with 'active' field, got {len(active_values)}"
+        assert True in active_values, "Expected at least one request with 'active = true'"
+        assert False in active_values, "Expected at least one request with 'active = false'"
+
     finally:
+        # Clear the global list for next test run
+        reimport_scan_requests.clear()
         server.shutdown()
         server.server_close()

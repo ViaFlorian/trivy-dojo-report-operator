@@ -122,7 +122,7 @@ def prepare_data(settings, body, isDeleteCallback) -> dict:
 
     active = settings.DEFECT_DOJO_ACTIVE
     if isDeleteCallback:
-        active = "false"
+        active = False
 
     data = {
         "active": active,
