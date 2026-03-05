@@ -1,4 +1,5 @@
 import json
+import os
 from io import BytesIO
 
 import kopf
@@ -74,26 +75,57 @@ def build_full_object(body: dict) -> dict:
     return full_object
 
 
-def evaluate_if_needed(setting: str, eval_flag: bool) -> str:
-    return eval(setting) if eval_flag else setting
+def dump_debug(name: str, data: dict | None, report: dict | None) -> None:
+    """Write debugging information to the tests directory so that tests can inspect it.
+
+    The files are written under ``tests/debug`` and named with the provided
+    ``name`` prefix. ``data`` corresponds to the payload sent to DefectDojo and
+    ``report`` corresponds to the full object built from the k8s resource.
+    Both are written as pretty-printed JSON.  The function is a no-op if the
+    directory cannot be created for some reason (tests will still run).
+    """
+    try:
+        os.makedirs("tests/debug", exist_ok=True)
+        if data is not None:
+            with open(os.path.join("tests/debug", f"{name}_data.json"), "w") as f:
+                json.dump(data, f, indent=2)
+        if report is not None:
+            with open(os.path.join("tests/debug", f"{name}_report.json"), "w") as f:
+                json.dump(report, f, indent=2)
+    except Exception:
+        # ignore any issues creating debug files; they are only for manual
+        # inspection while debugging the operator.
+        pass
 
 
-def prepare_data(settings) -> dict:
+def evaluate_if_needed(setting: str, eval_flag: bool, body) -> str:
+    if eval_flag:
+        assert body is not None, "body is required for eval"
+        return eval(setting)
+    else:
+        return setting
+
+
+def prepare_data(settings, body, isDeleteCallback) -> dict:
     _DEFECT_DOJO_ENGAGEMENT_NAME = evaluate_if_needed(
-        settings.DEFECT_DOJO_ENGAGEMENT_NAME, settings.DEFECT_DOJO_EVAL_ENGAGEMENT_NAME)
+        settings.DEFECT_DOJO_ENGAGEMENT_NAME, settings.DEFECT_DOJO_EVAL_ENGAGEMENT_NAME, body)
     _DEFECT_DOJO_PRODUCT_NAME = evaluate_if_needed(
-        settings.DEFECT_DOJO_PRODUCT_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_NAME)
+        settings.DEFECT_DOJO_PRODUCT_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_NAME, body)
     _DEFECT_DOJO_PRODUCT_TYPE_NAME = evaluate_if_needed(
-        settings.DEFECT_DOJO_PRODUCT_TYPE_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_TYPE_NAME)
+        settings.DEFECT_DOJO_PRODUCT_TYPE_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_TYPE_NAME, body)
     _DEFECT_DOJO_SERVICE_NAME = evaluate_if_needed(
-        settings.DEFECT_DOJO_SERVICE_NAME, settings.DEFECT_DOJO_EVAL_SERVICE_NAME)
+        settings.DEFECT_DOJO_SERVICE_NAME, settings.DEFECT_DOJO_EVAL_SERVICE_NAME, body)
     _DEFECT_DOJO_ENV_NAME = evaluate_if_needed(
-        settings.DEFECT_DOJO_ENV_NAME, settings.DEFECT_DOJO_EVAL_ENV_NAME)
+        settings.DEFECT_DOJO_ENV_NAME, settings.DEFECT_DOJO_EVAL_ENV_NAME, body)
     _DEFECT_DOJO_TEST_TITLE = evaluate_if_needed(
-        settings.DEFECT_DOJO_TEST_TITLE, settings.DEFECT_DOJO_EVAL_TEST_TITLE)
+        settings.DEFECT_DOJO_TEST_TITLE, settings.DEFECT_DOJO_EVAL_TEST_TITLE, body)
+
+    active = settings.DEFECT_DOJO_ACTIVE
+    if isDeleteCallback:
+        active = "false"
 
     data = {
-        "active": settings.DEFECT_DOJO_ACTIVE,
+        "active": active,
         "verified": settings.DEFECT_DOJO_VERIFIED,
         "close_old_findings": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS,
         "close_old_findings_product_scope": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE,
@@ -156,16 +188,15 @@ for report in settings.REPORTS:
 
         logger.debug(full_object)
 
-        data = prepare_data(settings)
+        data = prepare_data(settings, body, isDeleteCallback=False)
 
         logger.debug(data)
 
         report_file = create_report_file(full_object)
 
-        headers = {
-            "Authorization": "Token " + settings.DEFECT_DOJO_API_KEY,
-            "Accept": "application/json",
-        }
+        # dump payloads for debugging/comparison purposes. tests can look at
+        # ``tests/debug`` after running to compare create vs delete data.
+        dump_debug(f"send_{meta['name']}", data, full_object)
 
         try:
             response = send_to_dojo_request(
@@ -192,6 +223,7 @@ for report in settings.REPORTS:
             logger.info(f"Finished {body['kind']} {meta['name']}")
             logger.debug(response.content)
 
+    @REQUEST_TIME.time()
     @kopf.on.delete(report.lower() + ".aquasecurity.github.io", labels=labels)
     def handle_delete(body, meta, logger, **_):
         """
@@ -202,3 +234,11 @@ for report in settings.REPORTS:
         full_object = build_full_object(body)
 
         logger.debug(full_object)
+
+        data = prepare_data(settings, body, isDeleteCallback=True)
+
+        logger.debug(data)
+
+        # also persist debug output so we can compare against the create
+        # handler later.
+        dump_debug(f"delete_{meta['name']}", data, full_object)

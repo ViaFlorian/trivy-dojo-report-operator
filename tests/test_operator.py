@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import threading
 import time
@@ -27,11 +28,42 @@ class _DefectDojoMockHandler(BaseHTTPRequestHandler):
 
 
 def test_operator():
+    # clean up any previous debug output so comparisons start fresh
+    debug_dir = os.path.join("tests", "debug")
+    if os.path.isdir(debug_dir):
+        shutil.rmtree(debug_dir)
+
     # start a mock DefectDojo HTTP server on a random free port
     server = ThreadingHTTPServer(("localhost", 0), _DefectDojoMockHandler)
     port = server.server_address[1]
     os.environ.setdefault("DEFECT_DOJO_API_KEY", "test-api-key")
     os.environ.setdefault("DEFECT_DOJO_URL", f"http://localhost:{port}")
+    os.environ.setdefault("DEFECT_DOJO_ACTIVE", "true")
+    os.environ.setdefault("REPORTS", "vulnerabilityreports")
+    os.environ.setdefault("DEFECT_DOJO_AUTO_CREATE_CONTEXT", "true")
+    os.environ.setdefault("DEFECT_DOJO_CLOSE_OLD_FINDINGS", "true")
+    os.environ.setdefault(
+        "DEFECT_DOJO_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE", "true")
+    os.environ.setdefault("DEFECT_DOJO_DEDUPLICATION_ON_ENGAGEMENT", "false")
+    os.environ.setdefault("DEFECT_DOJO_DO_NOT_REACTIVATE", "false")
+    os.environ.setdefault("DEFECT_DOJO_ENGAGEMENT_NAME",
+                          "body['metadata']['namespace']")
+    os.environ.setdefault("DEFECT_DOJO_EVAL_ENGAGEMENT_NAME", "true")
+    os.environ.setdefault("DEFECT_DOJO_EVAL_SERVICE_NAME", "true")
+    os.environ.setdefault("DEFECT_DOJO_SERVICE_NAME",
+                          "f\"{body['metadata']['namespace']}/{body['metadata']['labels']['trivy-operator.resource.kind']}/{body['metadata']['labels']['trivy-operator.container.name']}\"")
+    os.environ.setdefault("DEFECT_DOJO_ENV_NAME", "production")
+    os.environ.setdefault("DEFECT_DOJO_EVAL_ENV_NAME", "false")
+    os.environ.setdefault("DEFECT_DOJO_EVAL_PRODUCT_NAME", "false")
+    os.environ.setdefault("DEFECT_DOJO_EVAL_PRODUCT_TYPE_NAME", "false")
+    os.environ.setdefault("DEFECT_DOJO_EVAL_TEST_TITLE", "false")
+    os.environ.setdefault("DEFECT_DOJO_MINIMUM_SEVERITY", "High")
+    os.environ.setdefault("DEFECT_DOJO_PRODUCT_NAME", "Security-Platform")
+    os.environ.setdefault("DEFECT_DOJO_PRODUCT_TYPE_NAME",
+                          "Research and Development")
+    os.environ.setdefault("DEFECT_DOJO_PUSH_TO_JIRA", "false")
+    os.environ.setdefault("DEFECT_DOJO_TEST_TITLE", "Kubernetes")
+    os.environ.setdefault("DEFECT_DOJO_VERIFIED", "false")
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
