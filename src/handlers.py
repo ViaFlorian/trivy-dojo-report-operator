@@ -73,6 +73,58 @@ def build_full_object(body):
         full_object[key] = body[key]
     return full_object
 
+
+def evaluate_if_needed(setting, eval_flag):
+    return eval(setting) if eval_flag else setting
+
+
+def prepare_data(settings):
+    _DEFECT_DOJO_ENGAGEMENT_NAME = evaluate_if_needed(
+        settings.DEFECT_DOJO_ENGAGEMENT_NAME, settings.DEFECT_DOJO_EVAL_ENGAGEMENT_NAME)
+    _DEFECT_DOJO_PRODUCT_NAME = evaluate_if_needed(
+        settings.DEFECT_DOJO_PRODUCT_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_NAME)
+    _DEFECT_DOJO_PRODUCT_TYPE_NAME = evaluate_if_needed(
+        settings.DEFECT_DOJO_PRODUCT_TYPE_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_TYPE_NAME)
+    _DEFECT_DOJO_SERVICE_NAME = evaluate_if_needed(
+        settings.DEFECT_DOJO_SERVICE_NAME, settings.DEFECT_DOJO_EVAL_SERVICE_NAME)
+    _DEFECT_DOJO_ENV_NAME = evaluate_if_needed(
+        settings.DEFECT_DOJO_ENV_NAME, settings.DEFECT_DOJO_EVAL_ENV_NAME)
+    _DEFECT_DOJO_TEST_TITLE = evaluate_if_needed(
+        settings.DEFECT_DOJO_TEST_TITLE, settings.DEFECT_DOJO_EVAL_TEST_TITLE)
+
+    data = {
+        "active": settings.DEFECT_DOJO_ACTIVE,
+        "verified": settings.DEFECT_DOJO_VERIFIED,
+        "close_old_findings": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS,
+        "close_old_findings_product_scope": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE,
+        "push_to_jira": settings.DEFECT_DOJO_PUSH_TO_JIRA,
+        "minimum_severity": settings.DEFECT_DOJO_MINIMUM_SEVERITY,
+        "auto_create_context": settings.DEFECT_DOJO_AUTO_CREATE_CONTEXT,
+        "deduplication_on_engagement": settings.DEFECT_DOJO_DEDUPLICATION_ON_ENGAGEMENT,
+        "scan_type": "Trivy Operator Scan",
+        "engagement_name": _DEFECT_DOJO_ENGAGEMENT_NAME,
+        "product_name": _DEFECT_DOJO_PRODUCT_NAME,
+        "product_type_name": _DEFECT_DOJO_PRODUCT_TYPE_NAME,
+        "service": _DEFECT_DOJO_SERVICE_NAME,
+        "environment": _DEFECT_DOJO_ENV_NAME,
+        "test_title": _DEFECT_DOJO_TEST_TITLE,
+        "do_not_reactivate": settings.DEFECT_DOJO_DO_NOT_REACTIVATE,
+    }
+    return data
+
+
+def create_report_file(full_object):
+    json_string = json.dumps(full_object)
+    json_file = BytesIO(json_string.encode("utf-8"))
+    return {"file": ("report.json", json_file)}
+
+
+def send_to_dojo_request(url, headers, data, files, proxies):
+    response = requests.post(
+        url, headers=headers, data=data, files=files, verify=True, proxies=proxies)
+    return response
+
+
 labels: dict = {}
 if settings.LABEL and settings.LABEL_VALUE:
     labels = {settings.LABEL: settings.LABEL_VALUE}
@@ -97,80 +149,24 @@ for report in settings.REPORTS:
 
         logger.debug(full_object)
 
-        _DEFECT_DOJO_ENGAGEMENT_NAME = (
-            eval(settings.DEFECT_DOJO_ENGAGEMENT_NAME)
-            if settings.DEFECT_DOJO_EVAL_ENGAGEMENT_NAME
-            else settings.DEFECT_DOJO_ENGAGEMENT_NAME
-        )
+        data = prepare_data(settings)
 
-        _DEFECT_DOJO_PRODUCT_NAME = (
-            eval(settings.DEFECT_DOJO_PRODUCT_NAME)
-            if settings.DEFECT_DOJO_EVAL_PRODUCT_NAME
-            else settings.DEFECT_DOJO_PRODUCT_NAME
-        )
+        logger.debug(data)
 
-        _DEFECT_DOJO_PRODUCT_TYPE_NAME = (
-            eval(settings.DEFECT_DOJO_PRODUCT_TYPE_NAME)
-            if settings.DEFECT_DOJO_EVAL_PRODUCT_TYPE_NAME
-            else settings.DEFECT_DOJO_PRODUCT_TYPE_NAME
-        )
-        _DEFECT_DOJO_SERVICE_NAME = (
-            eval(settings.DEFECT_DOJO_SERVICE_NAME)
-            if settings.DEFECT_DOJO_EVAL_SERVICE_NAME
-            else settings.DEFECT_DOJO_SERVICE_NAME
-        )
+        report_file = create_report_file(full_object)
 
-        _DEFECT_DOJO_ENV_NAME = (
-            eval(settings.DEFECT_DOJO_ENV_NAME)
-            if settings.DEFECT_DOJO_EVAL_ENV_NAME
-            else settings.DEFECT_DOJO_ENV_NAME
-        )
-
-        _DEFECT_DOJO_TEST_TITLE = (
-            eval(settings.DEFECT_DOJO_TEST_TITLE)
-            if settings.DEFECT_DOJO_EVAL_TEST_TITLE
-            else settings.DEFECT_DOJO_TEST_TITLE
-        )
-
-        # define the vulnerabilityreport as a json-file so DD accepts it
-        json_string: str = json.dumps(full_object)
-        json_file: BytesIO = BytesIO(json_string.encode("utf-8"))
-        report_file: dict = {"file": ("report.json", json_file)}
-
-        headers: dict = {
+        headers = {
             "Authorization": "Token " + settings.DEFECT_DOJO_API_KEY,
             "Accept": "application/json",
         }
 
-        data: dict = {
-            "active": settings.DEFECT_DOJO_ACTIVE,
-            "verified": settings.DEFECT_DOJO_VERIFIED,
-            "close_old_findings": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS,
-            "close_old_findings_product_scope": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE,
-            "push_to_jira": settings.DEFECT_DOJO_PUSH_TO_JIRA,
-            "minimum_severity": settings.DEFECT_DOJO_MINIMUM_SEVERITY,
-            "auto_create_context": settings.DEFECT_DOJO_AUTO_CREATE_CONTEXT,
-            "deduplication_on_engagement": settings.DEFECT_DOJO_DEDUPLICATION_ON_ENGAGEMENT,
-            "scan_type": "Trivy Operator Scan",
-            "engagement_name": _DEFECT_DOJO_ENGAGEMENT_NAME,
-            "product_name": _DEFECT_DOJO_PRODUCT_NAME,
-            "product_type_name": _DEFECT_DOJO_PRODUCT_TYPE_NAME,
-            "service": _DEFECT_DOJO_SERVICE_NAME,
-            "environment": _DEFECT_DOJO_ENV_NAME,
-            "test_title": _DEFECT_DOJO_TEST_TITLE,
-            "do_not_reactivate": settings.DEFECT_DOJO_DO_NOT_REACTIVATE,
-        }
-
-        logger.debug(data)
-
         try:
-            response: requests.Response = requests.post(
+            response = send_to_dojo_request(
                 settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
-                headers=headers,
-                data=data,
-                files=report_file,
-                verify=True,
-                proxies=proxies,
+                headers,
+                data,
+                report_file,
+                proxies,
             )
             response.raise_for_status()
         except HTTPError as http_err:
