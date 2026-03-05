@@ -188,3 +188,16 @@ for report in settings.REPORTS:
             c.labels("success").inc()
             logger.info(f"Finished {body['kind']} {meta['name']}")
             logger.debug(response.content)
+
+    @kopf.on.delete(report.lower() + ".aquasecurity.github.io", labels=labels)
+    def handle_delete(body, meta, logger, **_):
+        """
+        Handle deletion of aquasecurity resources.
+        """
+        logger.info(f"Detected deletion of {body['kind']} {meta['name']}")
+
+        full_object: dict = {}
+        for i in body:
+            full_object[i] = body[i]
+
+        logger.debug(full_object)
