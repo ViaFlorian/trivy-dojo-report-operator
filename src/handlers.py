@@ -125,6 +125,13 @@ def send_to_dojo_request(url: str, headers: dict, data: dict, files: dict, proxi
     return response
 
 
+def get_headers(settings) -> dict:
+    return {
+        "Authorization": "Token " + settings.DEFECT_DOJO_API_KEY,
+        "Accept": "application/json",
+    }
+
+
 labels: dict = {}
 if settings.LABEL and settings.LABEL_VALUE:
     labels = {settings.LABEL: settings.LABEL_VALUE}
@@ -163,7 +170,7 @@ for report in settings.REPORTS:
         try:
             response = send_to_dojo_request(
                 settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
-                headers,
+                get_headers(settings),
                 data,
                 report_file,
                 proxies,
