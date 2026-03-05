@@ -164,6 +164,39 @@ def get_headers(settings) -> dict:
     }
 
 
+def send_and_handle_response(url: str, headers: dict, data: dict, files: dict, proxies: dict, logger, kind: str, name: str) -> None:
+    """Send data to DefectDojo and handle the response with retries and metric tracking.
+
+    Args:
+        url: DefectDojo API endpoint URL
+        headers: HTTP headers including authorization
+        data: Request payload data
+        files: Files to send in the request
+        proxies: HTTP proxy configuration
+        logger: Kopf logger instance
+        kind: Kubernetes resource kind (for logging)
+        name: Kubernetes resource name (for logging)
+    """
+    try:
+        response = send_to_dojo_request(url, headers, data, files, proxies)
+        response.raise_for_status()
+    except HTTPError as http_err:
+        c.labels("failed").inc()
+        raise kopf.TemporaryError(
+            f"HTTP error occurred: {http_err} - {response.content}. Retrying in 60 seconds",
+            delay=60,
+        )
+    except Exception as err:
+        c.labels("failed").inc()
+        raise kopf.TemporaryError(
+            f"Other error occurred: {err}. Retrying in 60 seconds", delay=60
+        )
+    else:
+        c.labels("success").inc()
+        logger.info(f"Finished {kind} {name}")
+        logger.debug(response.content)
+
+
 labels: dict = {}
 if settings.LABEL and settings.LABEL_VALUE:
     labels = {settings.LABEL: settings.LABEL_VALUE}
@@ -198,36 +231,22 @@ for report in settings.REPORTS:
         # ``tests/debug`` after running to compare create vs delete data.
         dump_debug(f"send_{meta['name']}", data, full_object)
 
-        try:
-            response = send_to_dojo_request(
-                settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
-                get_headers(settings),
-                data,
-                report_file,
-                proxies,
-            )
-            response.raise_for_status()
-        except HTTPError as http_err:
-            c.labels("failed").inc()
-            raise kopf.TemporaryError(
-                f"HTTP error occurred: {http_err} - {response.content}. Retrying in 60 seconds",
-                delay=60,
-            )
-        except Exception as err:
-            c.labels("failed").inc()
-            raise kopf.TemporaryError(
-                f"Other error occurred: {err}. Retrying in 60 seconds", delay=60
-            )
-        else:
-            c.labels("success").inc()
-            logger.info(f"Finished {body['kind']} {meta['name']}")
-            logger.debug(response.content)
+        send_and_handle_response(
+            settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
+            get_headers(settings),
+            data,
+            report_file,
+            proxies,
+            logger,
+            body['kind'],
+            meta['name'],
+        )
 
     @REQUEST_TIME.time()
     @kopf.on.delete(report.lower() + ".aquasecurity.github.io", labels=labels)
     def handle_delete(body, meta, logger, **_):
         """
-        Handle deletion of aquasecurity resources.
+        Handle deletion of aquasecurity resources by deactivating findings in DefectDojo.
         """
         logger.info(f"Detected deletion of {body['kind']} {meta['name']}")
 
@@ -239,6 +258,19 @@ for report in settings.REPORTS:
 
         logger.debug(data)
 
+        report_file = create_report_file(full_object)
+
         # also persist debug output so we can compare against the create
         # handler later.
         dump_debug(f"delete_{meta['name']}", data, full_object)
+
+        send_and_handle_response(
+            settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
+            get_headers(settings),
+            data,
+            report_file,
+            proxies,
+            logger,
+            body['kind'],
+            meta['name'],
+        )
