@@ -258,6 +258,10 @@ for report in settings.REPORTS:
 
         logger.debug(data)
 
+        # Remove vulnerabilities from the report before sending
+        if 'report' in full_object and 'vulnerabilities' in full_object['report']:
+            full_object['report']['vulnerabilities'] = list()
+
         report_file = create_report_file(full_object)
 
         # also persist debug output so we can compare against the create
