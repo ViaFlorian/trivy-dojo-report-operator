@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -7,17 +8,65 @@ import time
 from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import pytest
 from kopf.testing import KopfRunner
+
+# configure logging for test diagnostics
+logging.basicConfig(level=logging.DEBUG,
+                    format="%(asctime)s %(levelname)s %(message)s")
+
+# module-level logger
+logger = logging.getLogger(__name__)
+
 
 # Global list to track reimport-scan requests
 reimport_scan_requests = []
+request_counter = 0
+
+
+@pytest.fixture(autouse=True)
+def cleanup_debug_dir():
+    """Clean up debug directory before every test execution."""
+    debug_dir = os.path.join("tests", "debug")
+    if os.path.isdir(debug_dir):
+        shutil.rmtree(debug_dir)
+    yield
+
+
+def write_request_debug(form_data, content_type):
+    """Write request form_data to a debug file for analysis."""
+    global request_counter
+    debug_dir = os.path.join("tests", "debug")
+    os.makedirs(debug_dir, exist_ok=True)
+
+    debug_file = os.path.join(debug_dir, f"request_{request_counter:03d}.json")
+    debug_data = {
+        "content_type": content_type,
+        "form_data": form_data
+    }
+
+    if form_data.get("file"):
+        try:
+            file_content = form_data["file"]
+            if isinstance(file_content, str):
+                file_content = json.loads(file_content)
+            # replace with parsed content for easier analysis
+            form_data["file"] = file_content
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing file content: {e}")
+
+    with open(debug_file, 'w') as f:
+        json.dump(debug_data, f, indent=2)
+
+    request_counter += 1
 
 
 def parse_multipart_form_data(body_bytes, content_type):
     """Parse multipart form data from request body."""
     form_data = {}
     # Construct a full email message with headers
-    full_message = b"Content-Type: " + content_type.encode() + b"\r\n\r\n" + body_bytes
+    full_message = b"Content-Type: " + content_type.encode() + b"\r\n\r\n" + \
+        body_bytes
     msg = BytesParser().parsebytes(full_message)
 
     # Get all parts of the multipart message
@@ -44,10 +93,14 @@ class _DefectDojoMockHandler(BaseHTTPRequestHandler):
 
             # Store the request body and content type for verification
             content_type = self.headers.get("Content-Type", "")
+            form_data = parse_multipart_form_data(body_bytes, content_type)
             reimport_scan_requests.append({
                 "body": body_bytes,
                 "content_type": content_type
             })
+
+            # Write debug information to file
+            write_request_debug(form_data, content_type)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -62,10 +115,8 @@ class _DefectDojoMockHandler(BaseHTTPRequestHandler):
 
 
 def test_operator():
-    # clean up any previous debug output so comparisons start fresh
-    debug_dir = os.path.join("tests", "debug")
-    if os.path.isdir(debug_dir):
-        shutil.rmtree(debug_dir)
+    global request_counter
+    request_counter = 0
 
     # start a mock DefectDojo HTTP server on a random free port
     server = ThreadingHTTPServer(("localhost", 0), _DefectDojoMockHandler)
@@ -132,21 +183,26 @@ def test_operator():
         assert len(
             reimport_scan_requests) == 2, f"Expected 2 reimport-scan calls, got {len(reimport_scan_requests)}"
 
-        # Parse the multipart form data from requests
-        active_values = []
-        for req in reimport_scan_requests:
+        # Parse the multipart form data from requests and verify contents
+        for index, item in enumerate(reimport_scan_requests):
             form_data = parse_multipart_form_data(
-                req["body"], req["content_type"])
-            # Convert string "True"/"False" to boolean
-            active_str = form_data.get("active", "").strip()
-            if active_str.lower() == "true":
-                active_values.append(True)
-            elif active_str.lower() == "false":
-                active_values.append(False)
+                item["body"], item["content_type"])
 
-        # Verify we have one "active = true" and one "active = false"
-        assert True in active_values, "Expected at least one request with 'active = true'"
-        assert False in active_values, "Expected at least one request with 'active = false'"
+            assert "service" in form_data, "Expected 'service' field in form data"
+            assert form_data["service"] == "default/ReplicaSet/alpine-sleep"
+            file_as_json = json.loads(form_data.get("file", "{}"))
+            if index == 0:
+                # First request should have findings
+                assert "vulnerabilities" in file_as_json.get(
+                    "report", {}), "Expected 'vulnerabilities' in file content for first request"
+                assert len(
+                    file_as_json["report"]["vulnerabilities"]) > 0, "Expected at least one vulnerability in first request"
+            else:
+                # Second request should have no findings
+                assert "vulnerabilities" in file_as_json.get(
+                    "report", {}), "Expected 'vulnerabilities' in file content for second request"
+                assert len(
+                    file_as_json["report"]["vulnerabilities"]) == 0, "Expected no vulnerabilities in second request"
 
     finally:
         # Clear the global list for next test run

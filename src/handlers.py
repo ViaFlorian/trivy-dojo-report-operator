@@ -75,29 +75,6 @@ def build_full_object(body: dict) -> dict:
     return full_object
 
 
-def dump_debug(name: str, data: dict | None, report: dict | None) -> None:
-    """Write debugging information to the tests directory so that tests can inspect it.
-
-    The files are written under ``tests/debug`` and named with the provided
-    ``name`` prefix. ``data`` corresponds to the payload sent to DefectDojo and
-    ``report`` corresponds to the full object built from the k8s resource.
-    Both are written as pretty-printed JSON.  The function is a no-op if the
-    directory cannot be created for some reason (tests will still run).
-    """
-    try:
-        os.makedirs("tests/debug", exist_ok=True)
-        if data is not None:
-            with open(os.path.join("tests/debug", f"{name}_data.json"), "w") as f:
-                json.dump(data, f, indent=2)
-        if report is not None:
-            with open(os.path.join("tests/debug", f"{name}_report.json"), "w") as f:
-                json.dump(report, f, indent=2)
-    except Exception:
-        # ignore any issues creating debug files; they are only for manual
-        # inspection while debugging the operator.
-        pass
-
-
 def evaluate_if_needed(setting: str, eval_flag: bool, body) -> str:
     if eval_flag:
         assert body is not None, "body is required for eval"
@@ -223,10 +200,6 @@ for report in settings.REPORTS:
 
         report_file = create_report_file(full_object)
 
-        # dump payloads for debugging/comparison purposes. tests can look at
-        # ``tests/debug`` after running to compare create vs delete data.
-        # dump_debug(f"send_{meta['name']}", data, full_object)
-
         send_and_handle_response(
             settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
             get_headers(settings),
@@ -259,10 +232,6 @@ for report in settings.REPORTS:
             full_object['report']['vulnerabilities'] = list()
 
         report_file = create_report_file(full_object)
-
-        # also persist debug output so we can compare against the create
-        # handler later.
-        # dump_debug(f"delete_{meta['name']}", data, full_object)
 
         send_and_handle_response(
             settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
