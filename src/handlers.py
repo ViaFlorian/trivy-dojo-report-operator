@@ -229,7 +229,7 @@ for report in settings.REPORTS:
 
         # dump payloads for debugging/comparison purposes. tests can look at
         # ``tests/debug`` after running to compare create vs delete data.
-        dump_debug(f"send_{meta['name']}", data, full_object)
+        # dump_debug(f"send_{meta['name']}", data, full_object)
 
         send_and_handle_response(
             settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
@@ -262,7 +262,7 @@ for report in settings.REPORTS:
 
         # also persist debug output so we can compare against the create
         # handler later.
-        dump_debug(f"delete_{meta['name']}", data, full_object)
+        # dump_debug(f"delete_{meta['name']}", data, full_object)
 
         send_and_handle_response(
             settings.DEFECT_DOJO_URL + "/api/v2/reimport-scan/",
