@@ -23,6 +23,37 @@ proxies = {
 } if settings.HTTP_PROXY or settings.HTTPS_PROXY else None
 
 
+def check_product_exists(product_name: str, logger) -> bool:
+    """
+    Check if a product with the given name already exists in DefectDojo.
+    Returns True if the product exists, False otherwise.
+    """
+    headers: dict = get_headers(settings)
+
+    try:
+        response = requests.get(
+            settings.DEFECT_DOJO_URL + "/api/v2/products/",
+            headers=headers,
+            params={"name": product_name},
+            verify=True,
+            proxies=proxies,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        # Check if any products were returned
+        if data.get("count", 0) > 0:
+            logger.info(f"Product '{product_name}' already exists in DefectDojo")
+            return True
+        else:
+            logger.info(f"Product '{product_name}' does not exist yet in DefectDojo")
+            return False
+
+    except Exception as err:
+        logger.warning(f"Could not check if product exists: {err}. Assuming it doesn't exist.")
+        return False
+
+
 def check_allowed_reports(report: str):
     allowed_reports: list[str] = [
         "configauditreports",
@@ -119,8 +150,8 @@ def prepare_data(settings, body) -> dict:
 
 
 def create_report_file(full_object: dict) -> dict:
-    json_string = json.dumps(full_object)
-    json_file = BytesIO(json_string.encode("utf-8"))
+    json_string: str = json.dumps(full_object)
+    json_file: BytesIO = BytesIO(json_string.encode("utf-8"))
     return {"file": ("report.json", json_file)}
 
 
@@ -195,6 +226,20 @@ for report in settings.REPORTS:
         logger.debug(full_object)
 
         data = prepare_data(settings, body)
+
+        _DEFECT_DOJO_PRODUCT_NAME = evaluate_if_needed(settings.DEFECT_DOJO_PRODUCT_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_NAME, body)
+        _DEFECT_DOJO_PRODUCT_TYPE_NAME = evaluate_if_needed(settings.DEFECT_DOJO_PRODUCT_TYPE_NAME, settings.DEFECT_DOJO_EVAL_PRODUCT_TYPE_NAME, body)
+
+        # Check if product already exists to avoid product_type conflicts
+        product_exists = check_product_exists(_DEFECT_DOJO_PRODUCT_NAME, logger)
+
+        # Only include product_type_name if product doesn't exist yet
+        # This prevents conflicts when a product is already assigned to a different product type
+        if not product_exists and _DEFECT_DOJO_PRODUCT_TYPE_NAME:
+            data["product_type_name"] = _DEFECT_DOJO_PRODUCT_TYPE_NAME
+            logger.info(f"Including product_type_name: {_DEFECT_DOJO_PRODUCT_TYPE_NAME}")
+        else:
+            logger.info("Product already exists, omitting product_type_name to avoid conflicts")
 
         logger.debug(data)
 
