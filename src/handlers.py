@@ -106,7 +106,7 @@ def evaluate_if_needed(setting: str, eval_flag: bool, body) -> str:
         return setting
 
 
-def prepare_data(settings, body, isDeleteCallback) -> dict:
+def prepare_data(settings, body) -> dict:
     _DEFECT_DOJO_ENGAGEMENT_NAME = evaluate_if_needed(
         settings.DEFECT_DOJO_ENGAGEMENT_NAME, settings.DEFECT_DOJO_EVAL_ENGAGEMENT_NAME, body)
     _DEFECT_DOJO_PRODUCT_NAME = evaluate_if_needed(
@@ -120,12 +120,8 @@ def prepare_data(settings, body, isDeleteCallback) -> dict:
     _DEFECT_DOJO_TEST_TITLE = evaluate_if_needed(
         settings.DEFECT_DOJO_TEST_TITLE, settings.DEFECT_DOJO_EVAL_TEST_TITLE, body)
 
-    active = settings.DEFECT_DOJO_ACTIVE
-    if isDeleteCallback:
-        active = False
-
     data = {
-        "active": active,
+        "active": settings.DEFECT_DOJO_ACTIVE,
         "verified": settings.DEFECT_DOJO_VERIFIED,
         "close_old_findings": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS,
         "close_old_findings_product_scope": settings.DEFECT_DOJO_CLOSE_OLD_FINDINGS_PRODUCT_SCOPE,
@@ -221,7 +217,7 @@ for report in settings.REPORTS:
 
         logger.debug(full_object)
 
-        data = prepare_data(settings, body, isDeleteCallback=False)
+        data = prepare_data(settings, body)
 
         logger.debug(data)
 
@@ -254,7 +250,7 @@ for report in settings.REPORTS:
 
         logger.debug(full_object)
 
-        data = prepare_data(settings, body, isDeleteCallback=False)
+        data = prepare_data(settings, body)
 
         logger.debug(data)
 
