@@ -1,5 +1,5 @@
 name: build-image
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   workflow_dispatch:
   pull_request:
   push:
@@ -15,35 +15,44 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      -
-        name: Set up QEMU
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
-      -
-        name: Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      -
-        name: Login to ghcr.io
+      - name: Login to ghcr.io
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-        if: github.event_name == 'release'
-      -
-        name: Build the container
+        # if: github.event_name == 'release'
+      - name: Build the container
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           push: false
-      -
-        name: Build and push to ghcr.io
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta-docker
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch,suffix={{branch}}-{{sha}}
+            type=ref,event=pr,suffix={{branch}}-{{sha}}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          flavor: |
+            latest=auto
+            prefix=
+            suffix=
+      - name: Build and push to ghcr.io
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           platforms: linux/amd64,linux/arm64
           context: .
           push: true
-          tags: ghcr.io/telekom-mms/docker-trivy-dojo-operator:latest,ghcr.io/telekom-mms/docker-trivy-dojo-operator:${{ github.event.release.tag_name }}
-        if: github.event_name == 'release'
+          # tags: ghcr.io/telekom-mms/docker-trivy-dojo-operator:latest,ghcr.io/telekom-mms/docker-trivy-dojo-operator:${{ github.event.release.tag_name }}
+          tags: ${{ steps.meta-docker.outputs.tags }}
+          labels: ${{ steps.meta-docker.outputs.labels }}
+        # if: github.event_name == 'release'
