@@ -4,12 +4,33 @@ import shutil
 import subprocess
 import threading
 import time
+from email.parser import BytesParser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from kopf.testing import KopfRunner
 
 # Global list to track reimport-scan requests
 reimport_scan_requests = []
+
+
+def parse_multipart_form_data(body_bytes, content_type):
+    """Parse multipart form data from request body."""
+    form_data = {}
+    # Construct a full email message with headers
+    full_message = b"Content-Type: " + content_type.encode() + b"\r\n\r\n" + body_bytes
+    msg = BytesParser().parsebytes(full_message)
+
+    # Get all parts of the multipart message
+    if msg.is_multipart():
+        for part in msg.get_payload():
+            name = part.get_param('name', header='content-disposition')
+            if name:
+                payload = part.get_payload(decode=True)
+                if isinstance(payload, bytes):
+                    payload = payload.decode('utf-8')
+                form_data[name] = payload
+
+    return form_data
 
 
 class _DefectDojoMockHandler(BaseHTTPRequestHandler):
@@ -21,8 +42,12 @@ class _DefectDojoMockHandler(BaseHTTPRequestHandler):
             if length:
                 body_bytes = self.rfile.read(length)
 
-            # Store the request body for verification
-            reimport_scan_requests.append(body_bytes)
+            # Store the request body and content type for verification
+            content_type = self.headers.get("Content-Type", "")
+            reimport_scan_requests.append({
+                "body": body_bytes,
+                "content_type": content_type
+            })
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -107,21 +132,19 @@ def test_operator():
         assert len(
             reimport_scan_requests) == 2, f"Expected 2 reimport-scan calls, got {len(reimport_scan_requests)}"
 
-        # Parse the request bodies as JSON
-        bodies = []
-        for req_body in reimport_scan_requests:
-            try:
-                bodies.append(json.loads(req_body.decode('utf-8')))
-            except json.JSONDecodeError:
-                bodies.append(req_body.decode('utf-8'))
-
-        # Extract active values from requests
-        active_values = [body.get("active")
-                         for body in bodies if isinstance(body, dict)]
+        # Parse the multipart form data from requests
+        active_values = []
+        for req in reimport_scan_requests:
+            form_data = parse_multipart_form_data(
+                req["body"], req["content_type"])
+            # Convert string "True"/"False" to boolean
+            active_str = form_data.get("active", "").strip()
+            if active_str.lower() == "true":
+                active_values.append(True)
+            elif active_str.lower() == "false":
+                active_values.append(False)
 
         # Verify we have one "active = true" and one "active = false"
-        assert len(
-            active_values) == 2, f"Expected 2 requests with 'active' field, got {len(active_values)}"
         assert True in active_values, "Expected at least one request with 'active = true'"
         assert False in active_values, "Expected at least one request with 'active = false'"
 
