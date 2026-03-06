@@ -254,7 +254,7 @@ for report in settings.REPORTS:
 
         logger.debug(full_object)
 
-        data = prepare_data(settings, body, isDeleteCallback=True)
+        data = prepare_data(settings, body, isDeleteCallback=False)
 
         logger.debug(data)
 
