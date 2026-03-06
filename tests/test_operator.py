@@ -26,18 +26,18 @@ request_counter = 0
 
 @pytest.fixture(autouse=True)
 def cleanup_debug_dir():
-    """Clean up debug directory before every test execution."""
+    """Clean up and create debug directory before every test execution."""
     debug_dir = os.path.join("tests", "debug")
     if os.path.isdir(debug_dir):
         shutil.rmtree(debug_dir)
     yield
+    os.makedirs(debug_dir, exist_ok=True)
 
 
 def write_request_debug(form_data, content_type):
     """Write request form_data to a debug file for analysis."""
     global request_counter
     debug_dir = os.path.join("tests", "debug")
-    os.makedirs(debug_dir, exist_ok=True)
 
     debug_file = os.path.join(debug_dir, f"request_{request_counter:03d}.json")
     debug_data = {
